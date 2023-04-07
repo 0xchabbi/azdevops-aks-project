@@ -1,0 +1,260 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  GOOS: 'linux'
+  GOARCH: 'amd64'
+  imagePullSecret: 'secret'
+  acrname: 'myacrchabbi'
+  aksname: 'clusterchabbi'
+  dockerregistry: 'akschabbi97'
+  kubernetesserviceconnection: 'kubechabbi'
+  azureserviceconnection: 'serviceconnection1'
+  aksazureresourcegroup: 'akschabbi'
+  azureSubscriptionid: '8fdfcd42-cb6a-4f09-bd1d-984a332c84b1'
+  tenantid: 'fdef0e9e-1806-4ce4-aa18-c0108177ce02'
+
+
+
+steps:
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'az login'
+  displayName: 'Azure login'
+
+- task: AzureKeyVault@2
+  inputs:
+    azureSubscription: 'serviceconnection1'
+    KeyVaultName: 'keyvault-chabbi'
+    SecretsFilter: 'Clientid,Clientsecret,Adotoken'
+    RunAsPreJob: true
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: | ##export the var as pipeline var not env. var
+      echo "Setting pipeline variables..."
+      echo "##vso[task.setvariable variable=ARM_CLIENT_ID;isOutput=true]$(Clientid)"
+      echo "##vso[task.setvariable variable=ARM_CLIENT_SECRET;isOutput=true]$(Clientsecret)"
+      echo "##vso[task.setvariable variable=ARM_ADO_TOKEN;isOutput=true]$(Adotoken)"
+  displayName: 'Set pipeline variables for keyvault'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      az login --service-principal -u $(Clientid) -p $(Clientsecret) --tenant $(tenantid)
+      az account set --subscription '$(azureSubscriptionid)'
+      az acr login --name '$(acrname)'
+      az aks get-credentials --resource-group '$(aksazureresourcegroup)' --name '$(aksname)'
+      az acr update -n $(acrname) --admin-enabled true
+  displayName: 'Get aks and acr credentials'
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Setting pipeline variables..."
+      echo "##vso[task.setvariable variable=ACR_NAME;isOutput=true]$(myacrchabbi)"
+      echo "##vso[task.setvariable variable=ACR_REGISTRY>$(az acr show --name'myacrchabbi' --query loginServer --output tsv)>"
+      echo "##vso[task.setvariable variable=ACR_USERNAME>$(az acr credential show --name'myacrchabbi' --query username --output tsv)>"
+      echo "##vso[task.setvariable variable=ACR_PASSWORD>$(az acr credential show --name'myacrchabbi' --query passwords[0].value --output tsv)>"
+      echo "##vso[task.setvariable variable=AKS_CONNECTION>$(az aks show --resource-group'akschabbi' --name'clusterchabbi' --query id --output tsv)>"
+  displayName: 'Set pipeline variables for acr and aks'
+
+
+# - task: TerraformCLI@0
+#   displayName: 'check terraform version' $(ACR_NAME) $(ACR_REGISTRY) $(ACR_USERNAME) $(ACR_PASSWORD) $(AKS_CONNECTION)
+#   inputs:
+#     command: version
+
+# - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+#   displayName: ‘Install Terraform latest’
+#   inputs:
+#     terraformVersion: latest
+
+# - task: TerraformTaskV4@4
+#   inputs:
+#      provider: 'azurerm'
+#      command: 'init'
+#      workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#      commandOptions: '-backend-config="client_id=$(ARM_CLIENT_ID)" -backend-config="client_secret=$(ARM_CLIENT_SECRET)"'
+#      backendServiceArm: 'serviceconnection1'
+#      backendAzureRmSubscriptionId: $(azureSubscriptionid)
+#      backendAzureRmResourceGroupLocation: 'westeurope'
+#      backendAzureRmResourceGroupName: 'stgchabbi'
+#      backendAzureRmStorageAccountName: 'stgchabbi1'
+#      backendAzureRmContainerName: 'tfcontainer'
+#      backendAzureRmKey: 'tf/terraform.tfstate'
+#      StorageContainerName: 'tfcontainer'
+#   displayName: 'Terraform Init'
+
+# - task: TerraformTaskV4@4
+#   inputs:
+#     provider: 'azurerm'
+#     command: 'plan'
+#     workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#     commandOptions: '-out=tfplan -var "client_id=$(ARM_CLIENT_ID)" -var "client_secret=$(ARM_CLIENT_SECRET)"'
+#     environmentServiceNameAzureRM: 'serviceconnection1'
+#   displayName: 'Terraform Plan'
+
+# - task: TerraformTaskV4@4
+#   inputs:
+#     provider: 'azurerm'
+#     command: 'apply'
+#     workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#     commandOptions: '-auto-approve -var "client_id=$(ARM_CLIENT_ID)" -var "client_secret=$(ARM_CLIENT_SECRET)"'
+#     environmentServiceNameAzureRM: 'serviceconnection1'
+#   displayName: 'Terraform Apply'
+
+
+- task: GoTool@0
+  inputs:
+    version: '1.19'
+- task: Go@0
+  inputs:
+    command: 'get'
+    arguments: '-d'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+- task: Go@0
+  inputs:
+    command: 'build'
+    arguments: '-o $(Build.BinariesDirectory) '
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+- task: CopyFiles@2
+  inputs:
+    Contents: |
+      $(System.DefaultWorkingDirectory)/manifest/deployment.yml
+      $(System.DefaultWorkingDirectory)/manifest/service.yml
+    TargetFolder: '$(Pipeline.Workspace)/s/manifest'
+
+
+
+- task: Docker@2
+  displayName: Build Docker image
+  inputs:
+    containerRegistry: $(ACR_REGISTRY) ##$(dockerregistry)
+    repository: '$(acrname)/http-echo'
+    command: 'build'
+    Dockerfile: 'Dockerfile'
+    buildContext: '$(System.DefaultWorkingDirectory)'
+    tags: |
+      $(Build.BuildId)
+      latest
+
+
+- task: Docker@2
+  displayName: Push Docker image to ACR
+  inputs:
+    containerRegistry: $(ACR_REGISTRY) #$(dockerregistry)
+    repository: '$(acrname)/http-echo'
+    command: 'push'
+    Dockerfile: 'Dockerfile'
+    tags: |
+      $(Build.BuildId)
+      latest
+
+- task: KubernetesManifest@0
+  displayName: Create imagePullSecret
+  inputs:
+    action: createSecret
+    secretName: $(imagePullSecret)
+    dockerRegistryEndpoint: $(ACR_REGISTRY) #$(dockerregistry)
+    kubernetesServiceConnection: $(AKS_CONNECTION) #$(kubernetesserviceconnection)
+    namespace: 'default'
+
+- script: |
+   envsubst < $(Pipeline.Workspace)/s/manifest/deployment.yml.template >  $(Pipeline.Workspace)/s/manifest/deployment.yml
+  displayName: 'Script task'
+
+# - task: KubernetesManifest@0
+#   displayName: Delete Kubernetes cluster
+#   inputs:
+#     action: delete
+#     kubernetesServiceConnection: '$(kubernetesserviceconnection)'
+#     namespace: 'default'
+#     rolloutStatusTimeout: 5
+#     arguments: deployment web
+
+
+# - task: Bash@3
+#   displayName: 'Get Kubeconfig file'
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       az aks get-credentials --resource-group $(aksazureresourcegroup) --name $(aksname) --overwrite-existing
+#       echo $(cat /home/vsts/.kube/config) | base64 -w 0 > kubeconfig.txt
+#       echo "##vso[task.setvariable variable=kubeconfig]$(cat kubeconfig.txt)"
+#     workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+- task: KubernetesManifest@0
+  displayName: Deploy to Kubernetes cluster
+  inputs:
+    action: deploy
+    kubernetesServiceConnection: '$(AKS_CONNECTION)'
+    namespace: 'default'
+    rolloutStatusTimeout: 5
+    useConfigurationFile: true
+    manifests: |
+      $(Pipeline.Workspace)/s/manifest/deployment.yml
+      $(Pipeline.Workspace)/s/manifest/service.yml
+    imagePullSecrets: |
+      $(imagePullSecret)
+    containers: |
+      $(acrname)/http-echo:$(Build.BuildId)
+
+
+- task: HelmInstaller@1
+  inputs:
+    helmVersionToInstall: 'latest'
+    checkLatestVersion: true
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: $(azureserviceconnection)
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az aks get-credentials --resource-group $(aksazureresourcegroup) --name $(aksname)
+      helm repo add haproxytech https://haproxytech.github.io/helm-charts
+      helm repo update
+      helm upgrade --install kubernetes-ingress haproxytech/kubernetes-ingress --create-namespace --namespace haproxy-controller --set controller.service.type=LoadBalancer
+  displayName: Deploy HA-Proxy-ingress
+
+- task: Kubernetes@1
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscriptionEndpoint: $(azureserviceconnection)
+    azureResourceGroup: $(aksazureresourcegroup)
+    kubernetesCluster: $(aksname)
+    kubernetesServiceEndpoint: $(AKS_CONNECTION) #$(kubernetesserviceconnection)
+    command: 'get'
+    arguments: 'services --namespace haproxy-controller kubernetes-ingress'
+    outputFormat: jsonpath={.status.loadBalancer.ingress[0].ip} ##show the external ip in a proper way
+  displayName: 'Get external IP'
+  name: GetExternalIP
+
+
+- task: Bash@3
+  inputs: 
+    targetType: 'inline'
+    script: |
+      curl -v http://${GETEXTERNALIP_KUBECTLOUTPUT}
+  displayName: 'Curl Test'
+
+# - task: TerraformTaskV4@4
+#   inputs:
+#     provider: 'azurerm'
+#     command: 'destroy'
+#     workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#     commandOptions: '-auto-approve -var "client_id=$(ARM_CLIENT_ID)" -var "client_secret=$(ARM_CLIENT_SECRET)"'
+#     environmentServiceNameAzureRM: 'serviceconnection1'
+#   displayName: Terraform destroy
+
+- task: PublishBuildArtifacts@1
+  inputs:
+     artifactName: drop

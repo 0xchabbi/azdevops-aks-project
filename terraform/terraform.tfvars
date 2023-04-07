@@ -1,0 +1,9 @@
+resource_group_name = "akschabbi"
+location            = "westeurope"
+cluster_name        = "clusterchabbi"
+kubernetes_version  = "1.25.5"
+system_node_count   = 2
+acr_name            = "myacrchabbi"
+load_test_name      = "loadtestchabbi"
+subscription_id     = "8fdfcd42-cb6a-4f09-bd1d-984a332c84b1"
+tenant_id           = "fdef0e9e-1806-4ce4-aa18-c0108177ce02"
