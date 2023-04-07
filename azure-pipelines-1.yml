@@ -43,27 +43,27 @@ steps:
       echo "##vso[task.setvariable variable=ARM_ADO_TOKEN;isOutput=true]$(Adotoken)"
   displayName: 'Set pipeline variables for keyvault'
 
-- task: Bash@3
-  inputs:
-    targetType: 'inline'
-    script: |
-      az login --service-principal -u $(Clientid) -p $(Clientsecret) --tenant $(tenantid)
-      az account set --subscription '$(azureSubscriptionid)'
-      az acr login --name '$(acrname)'
-      az aks get-credentials --resource-group '$(aksazureresourcegroup)' --name '$(aksname)'
-      az acr update -n $(acrname) --admin-enabled true
-  displayName: 'Get aks and acr credentials'
-- task: Bash@3
-  inputs:
-    targetType: 'inline'
-    script: |
-      echo "Setting pipeline variables..."
-      echo "##vso[task.setvariable variable=ACR_NAME;isOutput=true]$(myacrchabbi)"
-      echo "##vso[task.setvariable variable=ACR_REGISTRY>$(az acr show --name'myacrchabbi' --query loginServer --output tsv)>"
-      echo "##vso[task.setvariable variable=ACR_USERNAME>$(az acr credential show --name'myacrchabbi' --query username --output tsv)>"
-      echo "##vso[task.setvariable variable=ACR_PASSWORD>$(az acr credential show --name'myacrchabbi' --query passwords[0].value --output tsv)>"
-      echo "##vso[task.setvariable variable=AKS_CONNECTION>$(az aks show --resource-group'akschabbi' --name'clusterchabbi' --query id --output tsv)>"
-  displayName: 'Set pipeline variables for acr and aks'
+# - task: Bash@3
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       az login --service-principal -u $(Clientid) -p $(Clientsecret) --tenant $(tenantid)
+#       az account set --subscription '$(azureSubscriptionid)'
+#       az acr login --name '$(acrname)'
+#       az aks get-credentials --resource-group '$(aksazureresourcegroup)' --name '$(aksname)'
+#       az acr update -n $(acrname) --admin-enabled true
+#   displayName: 'Get aks and acr credentials'
+# - task: Bash@3
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       echo "Setting pipeline variables..."
+#       echo "##vso[task.setvariable variable=ACR_NAME;isOutput=true]$(myacrchabbi)"
+#       echo "##vso[task.setvariable variable=ACR_REGISTRY>$(az acr show --name'myacrchabbi' --query loginServer --output tsv)>"
+#       echo "##vso[task.setvariable variable=ACR_USERNAME>$(az acr credential show --name'myacrchabbi' --query username --output tsv)>"
+#       echo "##vso[task.setvariable variable=ACR_PASSWORD>$(az acr credential show --name'myacrchabbi' --query passwords[0].value --output tsv)>"
+#       echo "##vso[task.setvariable variable=AKS_CONNECTION>$(az aks show --resource-group'akschabbi' --name'clusterchabbi' --query id --output tsv)>"
+#   displayName: 'Set pipeline variables for acr and aks'
 
 
 # - task: TerraformCLI@0
@@ -137,7 +137,7 @@ steps:
 - task: Docker@2
   displayName: Build Docker image
   inputs:
-    containerRegistry: $(ACR_REGISTRY) ##$(dockerregistry)
+    containerRegistry: $(dockerregistry)
     repository: '$(acrname)/http-echo'
     command: 'build'
     Dockerfile: 'Dockerfile'
@@ -150,7 +150,7 @@ steps:
 - task: Docker@2
   displayName: Push Docker image to ACR
   inputs:
-    containerRegistry: $(ACR_REGISTRY) #$(dockerregistry)
+    containerRegistry: $(dockerregistry)
     repository: '$(acrname)/http-echo'
     command: 'push'
     Dockerfile: 'Dockerfile'
@@ -163,8 +163,8 @@ steps:
   inputs:
     action: createSecret
     secretName: $(imagePullSecret)
-    dockerRegistryEndpoint: $(ACR_REGISTRY) #$(dockerregistry)
-    kubernetesServiceConnection: $(AKS_CONNECTION) #$(kubernetesserviceconnection)
+    dockerRegistryEndpoint: $(dockerregistry)
+    kubernetesServiceConnection: $(kubernetesserviceconnection)
     namespace: 'default'
 
 - script: |
@@ -195,7 +195,7 @@ steps:
   displayName: Deploy to Kubernetes cluster
   inputs:
     action: deploy
-    kubernetesServiceConnection: '$(AKS_CONNECTION)'
+    kubernetesServiceConnection: '$(kubernetesserviceconnection)'
     namespace: 'default'
     rolloutStatusTimeout: 5
     useConfigurationFile: true
@@ -231,7 +231,7 @@ steps:
     azureSubscriptionEndpoint: $(azureserviceconnection)
     azureResourceGroup: $(aksazureresourcegroup)
     kubernetesCluster: $(aksname)
-    kubernetesServiceEndpoint: $(AKS_CONNECTION) #$(kubernetesserviceconnection)
+    kubernetesServiceEndpoint: $(kubernetesserviceconnection)
     command: 'get'
     arguments: 'services --namespace haproxy-controller kubernetes-ingress'
     outputFormat: jsonpath={.status.loadBalancer.ingress[0].ip} ##show the external ip in a proper way
