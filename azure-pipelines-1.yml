@@ -119,11 +119,13 @@ steps:
     command: 'get'
     arguments: '-d'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+  displayName: 'Go-get'
 - task: Go@0
   inputs:
     command: 'build'
     arguments: '-o $(Build.BinariesDirectory) '
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+  displayName: 'Go-build'
 
 - task: CopyFiles@2
   inputs:
@@ -171,14 +173,15 @@ steps:
    envsubst < $(Pipeline.Workspace)/s/manifest/deployment.yml.template >  $(Pipeline.Workspace)/s/manifest/deployment.yml
   displayName: 'Script task'
 
-# - task: KubernetesManifest@0
-#   displayName: Delete Kubernetes cluster
-#   inputs:
-#     action: delete
-#     kubernetesServiceConnection: '$(kubernetesserviceconnection)'
-#     namespace: 'default'
-#     rolloutStatusTimeout: 5
-#     arguments: deployment web
+##first deploy should be commented this task afterwards decomment it
+- task: KubernetesManifest@0
+  displayName: Delete Kubernetes cluster
+  inputs:
+    action: delete
+    kubernetesServiceConnection: '$(kubernetesserviceconnection)'
+    namespace: 'default'
+    rolloutStatusTimeout: 5
+    arguments: deployment web
 
 
 # - task: Bash@3
