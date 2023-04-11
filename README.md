@@ -48,7 +48,7 @@ To work on this project, you will need the following:
    ```bash
    terraform destroy
    ```
-## Detailed Deployment
+## Deployment
 
 To start, we use Terraform to create our infrastructure, which involves creating an AKS cluster and an ACR registry. Once the infrastructure is set up, we trigger the pipeline to deploy our application.
 
