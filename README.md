@@ -48,6 +48,17 @@ To work on this project, you will need the following:
    ```bash
    terraform destroy
    ```
+## Detailed Deployment
+
+To start, we use Terraform to create our infrastructure, which involves creating an AKS cluster and an ACR registry. Once the infrastructure is set up, we trigger the pipeline to deploy our application.
+
+The pipeline consists of several steps. Firstly, we make a safe Azure login through the pipeline to use the Azure CLI, ensuring secure access to our Azure resources. We then retrieve the secrets we need from the Azure Key Vault, which are set up in the pipeline environment for further pipeline steps.
+
+After retrieving the secrets, we build the application and create a Docker image that is pushed to the ACR registry. Then, the pipeline deploys the application to the AKS cluster using Helm to install the HA-Proxy ingress on the pipeline agent and then deploy it to the AKS cluster.
+
+Finally, we use a simple test to check whether the application and the ingress are working correctly. The pipeline exposes the external IP for the agent, and we test it with a curl -v command to check if the application is running as expected.
+
+In summary, we use Terraform to set up our infrastructure, and then use a pipeline to build and deploy our application to the AKS cluster. The pipeline ensures that everything is tested and working correctly before exposing it to external users, making it a secure and reliable solution.
 
 ## Troubleshooting
 
