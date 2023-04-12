@@ -30,9 +30,14 @@ To work on this project, you will need the following:
    ```bash 
    git clone https://github.com/0xchabbi/azdevops-aks-project.git
    ```
-2. Set up your Azure Devops and add this repo to your project.
-3. Add the right Serviceconnection in you AzureDevops project. This contains a serviceconnection to your Azure account, a dockerregistry serviceconnection and a kubernetes serviceconnection(this connection is possible after you set up with Terraform because you need your kubeconfig file)
-4. In your Terminal go to the Terraform-Folder
+2. Create or add Service Principal: to add do the following steps
+  ```bash 
+  az ad sp create-for-rbac --scopes /subscriptions/mySubscriptionID
+  ```
+3. Store the Keys in your Keyvault 
+4. Set up your Azure Devops and add this repo to your project.
+5. Add the right Serviceconnection in you AzureDevops project. This contains a serviceconnection to your Azure account, a dockerregistry serviceconnection and a kubernetes serviceconnection(this connection is possible after you set up with Terraform because you need your kubeconfig file)
+6. In your Terminal go to the Terraform-Folder
    ```bash
     #login to your azure account
     az login
@@ -43,8 +48,8 @@ To work on this project, you will need the following:
     #deploy the terraform modul to azure
     terraform apply
     ```
-5. Start the Pipeline in your AzureDevops project or trigger the pipeline with a push to your forked repo
-6. Destroy your work with:
+7. Start the Pipeline in your AzureDevops project or trigger the pipeline with a push to your forked repo
+8. Destroy your work with:
    ```bash
    terraform destroy
    ```
