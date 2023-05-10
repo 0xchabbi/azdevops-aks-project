@@ -5,7 +5,7 @@
 
 ## Architecture
 
-<img src="azdevops-aks-project.drawio.png" alt="Project-Architecture">
+<img src="AZDEVOPS-AKS-PROJECT.png" alt="Project-Architecture">
 
 
 ## Requirements
